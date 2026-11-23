@@ -119,7 +119,8 @@ Clique em **Publish branch** (na primeira vez) ou **Push origin** (nas próximas
 ### Passo 7: revisão e merge
 
 - Alguém do time lê o PR, testa e aprova, ou comenta pedindo ajustes.
-- Para ajustar: continue na mesma branch, faça novos commits e dê **Push origin**. O PR atualiza sozinho.
+- Para ajustar: continue na mesma branch, faça novos commits e dê **Push origin**. O PR atualiza sozinho. Depois de um ajuste, a aprovação anterior cai e alguém precisa aprovar de novo.
+- Cada comentário da revisão precisa ser marcado como **Resolve conversation** antes do merge.
 - Depois de aprovado, clique em **Merge pull request** no GitHub. Pronto, a mudança está na `main`.
 - Volte ao **Passo 1** para a próxima tarefa.
 
@@ -127,8 +128,8 @@ Clique em **Publish branch** (na primeira vez) ou **Push origin** (nas próximas
 
 ## Regras do time
 
-1. **Nunca trabalhe direto na `main`.** Sempre crie uma branch.
-2. **Todo PR precisa da aprovação de outra pessoa** antes do merge.
+1. **Nunca trabalhe direto na `main`.** Sempre crie uma branch. O GitHub bloqueia push direto na `main`: se aparecer um erro de *protected branch*, é isso.
+2. **Todo PR precisa da aprovação de outra pessoa** antes do merge. O botão de merge só libera depois disso.
 3. **Teste antes de abrir o PR**: rode `npm run dev` e confira no navegador, também com a janela estreita (celular).
 4. **Não suba senhas, chaves ou arquivos pessoais.** Na dúvida, pergunte antes.
 5. **Atualize a `main` todo dia** antes de começar (Passo 1).
