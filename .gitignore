@@ -20,3 +20,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# sequência de frames (regerável com build_logo.py)
+blender/renders/intro/
