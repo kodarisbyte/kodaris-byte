@@ -1,0 +1,22 @@
+# Blender
+*.blend1
+*.blend2
+*.blend@
+blender/cache/
+blender/renders/tmp/
+
+# Node / build
+node_modules/
+dist/
+build/
+.next/
+.astro/
+.env
+.env.*
+
+# SO / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
