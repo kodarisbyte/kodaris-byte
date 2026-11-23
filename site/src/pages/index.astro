@@ -67,11 +67,12 @@ const etapas = [
   </head>
 
   <body>
-    <div class="intro" aria-hidden="true">
-      <button class="intro-pular" type="button" tabindex="-1">Pular intro</button>
+    <div class="intro">
+      <button class="intro-pular" type="button">Pular intro</button>
     </div>
-    <!-- fora da .intro para o mix-blend-mode fundir com o site -->
-    <video class="intro-video" aria-hidden="true" muted playsinline preload="auto" src={media('logo-intro.mp4')}></video>
+    <!-- O vídeo (fundo preto) é desenhado no canvas com o preto virando transparência. -->
+    <canvas class="intro-logo" aria-hidden="true" width="900" height="900"></canvas>
+    <video class="intro-src" aria-hidden="true" muted playsinline preload="auto" src={media('logo-intro.mp4')}></video>
 
     <header class="topo">
       <div class="wrap topo-in">
@@ -366,16 +367,39 @@ const etapas = [
     z-index: 50;
     background: var(--noite);
   }
-  .intro-video { display: none; }
-  :global(html.com-intro) .intro-video {
+  .intro-logo,
+  .intro-src { display: none; }
+  :global(html.com-intro) .intro-logo {
     display: block;
     z-index: 51;
     position: fixed;
     width: min(78vmin, 640px);
     height: auto;
     aspect-ratio: 1;
-    mix-blend-mode: screen;
+    pointer-events: none;
     will-change: transform;
+  }
+  /* o vídeo precisa estar "visível" para o navegador decodificar; fica fora da tela */
+  :global(html.com-intro) .intro-src {
+    display: block;
+    position: fixed;
+    left: -10px;
+    top: -10px;
+    width: 2px;
+    height: 2px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* sem WebGL: usa o próprio vídeo com blend (plano B) */
+  :global(html.com-intro) .intro-src.plano-b {
+    left: auto;
+    top: auto;
+    z-index: 51;
+    width: min(78vmin, 640px);
+    height: auto;
+    aspect-ratio: 1;
+    opacity: 1;
+    mix-blend-mode: screen;
   }
   .intro-pular {
     position: fixed;
