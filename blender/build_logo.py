@@ -1,51 +1,60 @@
-"""Logo animada da Kodaris Byte — recriação da logo original (assets/brand/logo-original-linkedin.png).
-
-Membrana gelatinosa lavanda, com um K formado por feixes de fibras trançadas,
-núcleo de vidro com brilhos e fios finos que escapam das pontas.
+"""Monta a cena da logo animada da Kodaris Byte.
 
 Uso:
     blender -b --factory-startup --python blender/build_logo.py
-    blender -b blender/kodaris_logo.blend -a          # PNGs RGBA em renders/intro/
+Gera blender/kodaris_logo.blend. Para renderizar:
+    blender -b blender/kodaris_logo.blend -a
 
-Animação (30 fps, 120 frames = 4 s), fundo transparente:
-    0-30    membrana infla (com overshoot)
-    14-72   fibras crescem formando o K (haste, braço, perna)
-    48-96   fios soltos e arcos da membrana crescem
-    60-120  núcleo acende, brilhos aparecem, assenta
-O último frame é a logo estática.
+Estrutura da animação (30 fps, 150 frames = 5 s):
+    0-24    esfera de energia surge (escala com overshoot)
+    10-60   filamentos de plasma acendem
+    40-75   K aparece com um flash
+    75-150  idle: pulso suave, K girando levemente
+Fundo preto puro: no site use `mix-blend-mode: screen` para fundir com qualquer fundo escuro.
 """
 import math
 import os
-import random
 
+import bmesh
 import bpy
 from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-FPS, END = 30, 120
-rng = random.Random(7)
+FPS, END = 30, 150
 
 
-def lin(h):
+def srgb(h, a=1.0):
     h = h.lstrip("#")
     c = [int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple(x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c) + (1.0,)
+    lin = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
+    return (*lin, a)
 
 
-FIBER = lin("#A88CEB")
-FIBER_HI = lin("#D6C4FF")
-MEMBRANE = lin("#8E74D8")
-MEMBRANE_RIM = lin("#C7B5F2")
-CORE = lin("#7B5CD6")
+LAVENDER = srgb("#C8B8E8")
+LAVENDER_MID = srgb("#A898C8")
+VIOLET = srgb("#7A5FB0")
+VIOLET_HOT = srgb("#9B6BFF")
+DEEP = srgb("#483868")
 
 
-# ------------------------------------------------------------------ util
-def iter_fcurves(id_data):
+# ---------------------------------------------------------------- helpers
+def key(obj_or_socket, path, frame, value, interp="BEZIER"):
+    setattr(obj_or_socket, path, value) if not isinstance(value, (tuple, list)) else setattr(obj_or_socket, path, value)
+    obj_or_socket.keyframe_insert(path, frame=frame)
+
+
+def set_interp(id_data, interp):
     ad = id_data.animation_data
     if not ad or not ad.action:
         return
-    action = ad.action
-    if hasattr(action, "layers") and action.layers:  # actions em camadas (4.4+)
+    for fc in iter_fcurves(ad.action):
+        for kp in fc.keyframe_points:
+            kp.interpolation = interp
+
+
+def iter_fcurves(action):
+    # Blender 4.4+ usa actions em camadas (slots); mantém compat com fcurves antigas
+    if hasattr(action, "layers") and action.layers:
         for layer in action.layers:
             for strip in layer.strips:
                 for bag in strip.channelbags:
@@ -54,13 +63,7 @@ def iter_fcurves(id_data):
         yield from action.fcurves
 
 
-def keys(target, path, pairs):
-    for f, v in pairs:
-        setattr(target, path, v)
-        target.keyframe_insert(path, frame=f)
-
-
-def node(nt, kind, loc=(0, 0), **inputs):
+def node(nt, kind, loc, **inputs):
     n = nt.nodes.new(kind)
     n.location = loc
     for k, v in inputs.items():
@@ -68,14 +71,7 @@ def node(nt, kind, loc=(0, 0), **inputs):
     return n
 
 
-def new_mat(name):
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    m.node_tree.nodes.clear()
-    return m, m.node_tree
-
-
-# ------------------------------------------------------------------ cena
+# ---------------------------------------------------------------- scene
 scene = bpy.context.scene
 for o in list(bpy.data.objects):
     bpy.data.objects.remove(o)
@@ -84,336 +80,367 @@ scene.render.engine = "BLENDER_EEVEE"
 scene.render.fps = FPS
 scene.frame_start, scene.frame_end = 0, END
 scene.render.resolution_x = scene.render.resolution_y = 1080
-scene.render.film_transparent = True
+scene.render.film_transparent = False
 scene.eevee.taa_render_samples = 64
 scene.view_settings.view_transform = "Standard"
+scene.view_settings.look = "AgX - Punchy" if "AgX - Punchy" in [
+    i.identifier for i in scene.view_settings.bl_rna.properties["look"].enum_items] else "None"
 
-world = bpy.data.worlds.new("Ambient")
+world = bpy.data.worlds.new("Black")
 world.use_nodes = True
-bg = world.node_tree.nodes["Background"]
-bg.inputs["Color"].default_value = lin("#2A2040")
-bg.inputs["Strength"].default_value = 0.6
+bg = world.node_tree.nodes.get("Background")
+bg.inputs["Color"].default_value = (0, 0, 0, 1)
+bg.inputs["Strength"].default_value = 0
 scene.world = world
 
+# camera
 cam_data = bpy.data.cameras.new("Cam")
-cam_data.type = "ORTHO"
-cam_data.ortho_scale = 2.45
+cam_data.lens = 50
 cam = bpy.data.objects.new("Cam", cam_data)
-cam.location = (0, -6, 0)
+cam.location = (0, -4.6, 0)
 cam.rotation_euler = (math.radians(90), 0, 0)
 scene.collection.objects.link(cam)
 scene.camera = cam
 
-for name, loc, energy, color, size in (
-    ("Key", (-3, -4, 3), 320, (1.0, 0.95, 1.0), 3),
-    ("Fill", (3.5, -3, -1), 220, FIBER[:3], 3),
-    ("Rim", (0, 4, 2.5), 450, MEMBRANE_RIM[:3], 4),
-):
-    ld = bpy.data.lights.new(name, "AREA")
-    ld.energy, ld.size, ld.color = energy, size, color
-    lo = bpy.data.objects.new(name, ld)
-    lo.location = loc
-    lo.rotation_euler = (-Vector(loc)).to_track_quat("-Z", "Y").to_euler()
-    scene.collection.objects.link(lo)
-
+# raiz que gira devagar (a esfera inteira)
 root = bpy.data.objects.new("LogoRoot", None)
 scene.collection.objects.link(root)
 
 
-# ------------------------------------------------------------------ materiais
-def mat_membrane():
-    m, nt = new_mat("Membrane")
+# ---------------------------------------------------------------- materiais
+def mat_shell():
+    """Casca da esfera: borda brilhante (fresnel), centro transparente."""
+    m = bpy.data.materials.new("Shell")
+    m.use_nodes = True
     m.surface_render_method = "BLENDED"
-    m.use_backface_culling = True
-    out = node(nt, "ShaderNodeOutputMaterial", (1000, 0))
-    lw = node(nt, "ShaderNodeLayerWeight", (-600, 0), Blend=0.45)
-    # alpha: leitoso no centro, mais denso na borda
-    a = nt.nodes.new("ShaderNodeMapRange")
-    a.inputs[3].default_value = 0.5
-    a.inputs[4].default_value = 0.95
-    nt.links.new(lw.outputs["Facing"], a.inputs[0])
-    ramp = node(nt, "ShaderNodeValToRGB", (-350, 250))
-    ramp.color_ramp.elements[0].color = MEMBRANE
-    ramp.color_ramp.elements[1].color = MEMBRANE_RIM
-    nt.links.new(lw.outputs["Facing"], ramp.inputs[0])
-    em = node(nt, "ShaderNodeEmission", (0, 250), Strength=0.95)
-    nt.links.new(ramp.outputs[0], em.inputs["Color"])
-    gl = node(nt, "ShaderNodeBsdfGlossy", (0, 50), Roughness=0.18)
-    gl.inputs["Color"].default_value = (0.03, 0.025, 0.04, 1)
-    body = node(nt, "ShaderNodeAddShader", (250, 150))
-    nt.links.new(em.outputs[0], body.inputs[0])
-    nt.links.new(gl.outputs[0], body.inputs[1])
-    tr = node(nt, "ShaderNodeBsdfTransparent", (250, -100))
-    mix = node(nt, "ShaderNodeMixShader", (600, 0))
-    fade = node(nt, "ShaderNodeMath", (300, -250))
-    fade.operation = "MULTIPLY"
-    fade.name = "Fade"
-    fade.inputs[1].default_value = 1.0
-    nt.links.new(a.outputs[0], fade.inputs[0])
-    nt.links.new(fade.outputs[0], mix.inputs[0])
-    nt.links.new(tr.outputs[0], mix.inputs[1])
-    nt.links.new(body.outputs[0], mix.inputs[2])
-    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    m.use_backface_culling = False
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = node(nt, "ShaderNodeOutputMaterial", (900, 0))
+    lw = node(nt, "ShaderNodeLayerWeight", (-400, 0), Blend=0.35)
+    pw = node(nt, "ShaderNodeMath", (-200, 0))
+    pw.operation = "POWER"
+    pw.inputs[1].default_value = 2.2
+    nt.links.new(lw.outputs["Facing"], pw.inputs[0])
+    ramp = node(nt, "ShaderNodeValToRGB", (0, 150))
+    ramp.color_ramp.elements[0].color = DEEP
+    ramp.color_ramp.elements[1].color = LAVENDER
+    nt.links.new(pw.outputs[0], ramp.inputs[0])
+    strength = node(nt, "ShaderNodeMath", (0, -100))
+    strength.operation = "MULTIPLY"
+    strength.name = "ShellStrength"
+    strength.inputs[1].default_value = 3.0
+    nt.links.new(pw.outputs[0], strength.inputs[0])
+    em = node(nt, "ShaderNodeEmission", (300, 100))
+    nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
+    nt.links.new(strength.outputs[0], em.inputs["Strength"])
+    tr = node(nt, "ShaderNodeBsdfTransparent", (300, -100))
+    add = node(nt, "ShaderNodeAddShader", (600, 0))
+    nt.links.new(tr.outputs[0], add.inputs[0])
+    nt.links.new(em.outputs[0], add.inputs[1])
+    nt.links.new(add.outputs[0], out.inputs["Surface"])
     return m
 
 
-def mat_fiber():
-    m, nt = new_mat("Fiber")
-    out = node(nt, "ShaderNodeOutputMaterial", (600, 0))
-    lw = node(nt, "ShaderNodeLayerWeight", (-500, 0), Blend=0.5)
-    ramp = node(nt, "ShaderNodeValToRGB", (-250, 0))
-    ramp.color_ramp.elements[0].color = FIBER
-    ramp.color_ramp.elements[1].color = FIBER_HI
-    nt.links.new(lw.outputs["Facing"], ramp.inputs[0])
-    p = node(nt, "ShaderNodeBsdfPrincipled", (100, 0), Roughness=0.32)
-    p.inputs["Coat Weight"].default_value = 0.6
-    p.inputs["Emission Strength"].default_value = 0.35
-    p.name = "FiberBsdf"
-    nt.links.new(ramp.outputs[0], p.inputs["Base Color"])
-    nt.links.new(ramp.outputs[0], p.inputs["Emission Color"])
-    nt.links.new(p.outputs[0], out.inputs["Surface"])
+def mat_plasma():
+    """Filamentos de plasma: cristas finas de um ruído 4D animado (W)."""
+    m = bpy.data.materials.new("Plasma")
+    m.use_nodes = True
+    m.surface_render_method = "BLENDED"
+    m.use_backface_culling = False
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = node(nt, "ShaderNodeOutputMaterial", (1400, 0))
+    tc = node(nt, "ShaderNodeTexCoord", (-1000, 0))
+
+    def ridge(y, scale, width, w_name):
+        nz = node(nt, "ShaderNodeTexNoise", (-750, y), Scale=scale, Detail=3.0, Roughness=0.55, Distortion=0.6)
+        nz.noise_dimensions = "4D"
+        nz.name = w_name
+        nt.links.new(tc.outputs["Object"], nz.inputs["Vector"])
+        sub = node(nt, "ShaderNodeMath", (-550, y))
+        sub.operation = "SUBTRACT"
+        sub.inputs[1].default_value = 0.5
+        nt.links.new(nz.outputs["Fac"], sub.inputs[0])
+        ab = node(nt, "ShaderNodeMath", (-400, y))
+        ab.operation = "ABSOLUTE"
+        nt.links.new(sub.outputs[0], ab.inputs[0])
+        mr = nt.nodes.new("ShaderNodeMapRange")
+        mr.location = (-250, y)
+        mr.inputs[1].default_value = 0.0
+        mr.inputs[2].default_value = width
+        mr.inputs[3].default_value = 1.0
+        mr.inputs[4].default_value = 0.0
+        nt.links.new(ab.outputs[0], mr.inputs[0])
+        pw = node(nt, "ShaderNodeMath", (-80, y))
+        pw.operation = "POWER"
+        pw.inputs[1].default_value = 3.0
+        nt.links.new(mr.outputs[0], pw.inputs[0])
+        return pw
+
+    a = ridge(250, 1.5, 0.014, "NoiseA")
+    b = ridge(-150, 3.0, 0.008, "NoiseB")
+    bmul = node(nt, "ShaderNodeMath", (80, -150))
+    bmul.operation = "MULTIPLY"
+    bmul.inputs[1].default_value = 0.4
+    nt.links.new(b.outputs[0], bmul.inputs[0])
+    mx = node(nt, "ShaderNodeMath", (250, 100))
+    mx.operation = "MAXIMUM"
+    nt.links.new(a.outputs[0], mx.inputs[0])
+    nt.links.new(bmul.outputs[0], mx.inputs[1])
+
+    ramp = node(nt, "ShaderNodeValToRGB", (450, 250))
+    ramp.color_ramp.elements[0].color = VIOLET
+    ramp.color_ramp.elements[1].color = LAVENDER
+    ramp.color_ramp.elements[0].position = 0.35
+    nt.links.new(mx.outputs[0], ramp.inputs[0])
+    st = node(nt, "ShaderNodeMath", (450, -50))
+    st.operation = "MULTIPLY"
+    st.name = "PlasmaStrength"
+    st.inputs[1].default_value = 14.0
+    nt.links.new(mx.outputs[0], st.inputs[0])
+    em = node(nt, "ShaderNodeEmission", (750, 150))
+    nt.links.new(ramp.outputs["Color"], em.inputs["Color"])
+    nt.links.new(st.outputs[0], em.inputs["Strength"])
+    tr = node(nt, "ShaderNodeBsdfTransparent", (750, -100))
+    add = node(nt, "ShaderNodeAddShader", (1100, 0))
+    nt.links.new(tr.outputs[0], add.inputs[0])
+    nt.links.new(em.outputs[0], add.inputs[1])
+    nt.links.new(add.outputs[0], out.inputs["Surface"])
     return m
 
 
 def mat_core():
-    """Núcleo de vidro dentro de cada traço, com pontinhos de brilho."""
-    m, nt = new_mat("Core")
-    m.surface_render_method = "BLENDED"
-    out = node(nt, "ShaderNodeOutputMaterial", (1100, 0))
-    tc = node(nt, "ShaderNodeTexCoord", (-900, -200))
-    vo = node(nt, "ShaderNodeTexVoronoi", (-650, -200), Scale=55.0)
-    vo.voronoi_dimensions = "4D"
-    vo.name = "Sparkle"
-    nt.links.new(tc.outputs["Object"], vo.inputs["Vector"])
-    dot = nt.nodes.new("ShaderNodeMapRange")
-    dot.inputs[2].default_value = 0.09
-    dot.inputs[3].default_value = 1.0
-    dot.inputs[4].default_value = 0.0
-    nt.links.new(vo.outputs["Distance"], dot.inputs[0])
-    pick = node(nt, "ShaderNodeMath", (-400, -350))
-    pick.operation = "GREATER_THAN"
-    pick.inputs[1].default_value = 0.72
-    nt.links.new(vo.outputs["Color"], pick.inputs[0])
-    sp = node(nt, "ShaderNodeMath", (-200, -250))
-    sp.operation = "MULTIPLY"
-    nt.links.new(dot.outputs[0], sp.inputs[0])
-    nt.links.new(pick.outputs[0], sp.inputs[1])
-    spk = node(nt, "ShaderNodeMath", (0, -250))
-    spk.operation = "MULTIPLY"
-    spk.name = "SparkleStrength"
-    spk.inputs[1].default_value = 12.0
-    nt.links.new(sp.outputs[0], spk.inputs[0])
-    sem = node(nt, "ShaderNodeEmission", (250, -250))
-    sem.inputs["Color"].default_value = (0.95, 0.92, 1.0, 1)
-    nt.links.new(spk.outputs[0], sem.inputs["Strength"])
-
-    lw = node(nt, "ShaderNodeLayerWeight", (-400, 200), Blend=0.4)
-    cem = node(nt, "ShaderNodeEmission", (0, 200))
-    cem.inputs["Color"].default_value = CORE
-    cs = node(nt, "ShaderNodeMath", (-150, 100))
-    cs.operation = "MULTIPLY"
-    cs.name = "CoreStrength"
-    cs.inputs[1].default_value = 1.4
-    nt.links.new(lw.outputs["Facing"], cs.inputs[0])
-    nt.links.new(cs.outputs[0], cem.inputs["Strength"])
-    gl = node(nt, "ShaderNodeBsdfGlossy", (0, 400), Roughness=0.25)
-    gl.inputs["Color"].default_value = (0.08, 0.06, 0.12, 1)
-    tr = node(nt, "ShaderNodeBsdfTransparent", (250, 50))
-    a1 = node(nt, "ShaderNodeAddShader", (450, 250))
-    nt.links.new(gl.outputs[0], a1.inputs[0])
-    nt.links.new(cem.outputs[0], a1.inputs[1])
-    a2 = node(nt, "ShaderNodeAddShader", (650, 100))
-    nt.links.new(a1.outputs[0], a2.inputs[0])
-    nt.links.new(tr.outputs[0], a2.inputs[1])
-    a3 = node(nt, "ShaderNodeAddShader", (850, 0))
-    nt.links.new(a2.outputs[0], a3.inputs[0])
-    nt.links.new(sem.outputs[0], a3.inputs[1])
-    nt.links.new(a3.outputs[0], out.inputs["Surface"])
+    """Névoa volumétrica roxa no miolo da esfera."""
+    m = bpy.data.materials.new("Core")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = node(nt, "ShaderNodeOutputMaterial", (400, 0))
+    vol = node(nt, "ShaderNodeVolumePrincipled", (0, 0))
+    vol.inputs["Density"].default_value = 0.0
+    vol.inputs["Emission Color"].default_value = VIOLET
+    vol.inputs["Emission Strength"].default_value = 0.1
+    vol.name = "CoreVol"
+    nt.links.new(vol.outputs[0], out.inputs["Volume"])
     return m
 
 
-M_MEMBRANE, M_FIBER, M_CORE = mat_membrane(), mat_fiber(), mat_core()
+def mat_k():
+    m = bpy.data.materials.new("K")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = node(nt, "ShaderNodeOutputMaterial", (600, 0))
+    bsdf = node(nt, "ShaderNodeBsdfPrincipled", (0, 0))
+    bsdf.inputs["Base Color"].default_value = LAVENDER_MID
+    bsdf.inputs["Metallic"].default_value = 0.6
+    bsdf.inputs["Roughness"].default_value = 0.25
+    bsdf.inputs["Emission Color"].default_value = LAVENDER
+    bsdf.inputs["Emission Strength"].default_value = 0.0
+    bsdf.name = "KBsdf"
+    nt.links.new(bsdf.outputs[0], out.inputs["Surface"])
+    return m
 
 
-# ------------------------------------------------------------------ curvas
-def curve_obj(name, splines, bevel, mat, parent=root):
-    """splines: lista de listas de (Vector, raio)."""
-    cu = bpy.data.curves.new(name, "CURVE")
-    cu.dimensions = "3D"
-    cu.bevel_depth = bevel
-    cu.bevel_resolution = 3
-    cu.resolution_u = 10
-    cu.use_fill_caps = True
-    cu.bevel_factor_mapping_start = "SPLINE"
-    cu.bevel_factor_mapping_end = "SPLINE"
-    for pts in splines:
-        sp = cu.splines.new("NURBS")
-        sp.points.add(len(pts) - 1)
-        for p, (co, r) in zip(sp.points, pts):
-            p.co = (co.x, co.y, co.z, 1.0)
-            p.radius = r
-        sp.order_u = 4
-        sp.use_endpoint_u = True
-    o = bpy.data.objects.new(name, cu)
-    o.data.materials.append(mat)
-    o.parent = parent
+# ---------------------------------------------------------------- geometria
+def add_obj(name, mesh, parent=None, mat=None):
+    o = bpy.data.objects.new(name, mesh)
     scene.collection.objects.link(o)
+    if parent:
+        o.parent = parent
+    if mat:
+        o.data.materials.append(mat)
     return o
 
 
-def P(x, z, y=0.0):
-    return Vector((x, y, z))
+def uv_sphere(name, r, segs=96, rings=48):
+    me = bpy.data.meshes.new(name)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=segs, v_segments=rings, radius=r)
+    for f in bm.faces:
+        f.smooth = True
+    bm.to_mesh(me)
+    bm.free()
+    return me
 
 
-# traços do K (medidos na logo original; membrana ~ raio 1)
-STROKES = {
-    "Haste": (P(-0.33, 0.62), P(-0.44, -0.80), 0.115, 24),
-    "Braco": (P(-0.24, -0.06), P(0.62, 0.55), 0.10, 20),
-    "Perna": (P(-0.20, 0.02), P(0.66, -0.70), 0.10, 20),
-}
-
-
-def profile(t):
-    """Fuso: fino nas pontas, cheio no meio."""
-    return max(0.0, math.sin(math.pi * min(max(t, 0), 1))) ** 0.6
-
-
-def frame_of(a, b):
+def strip(a, b, t, clip_a, clip_b):
+    """Faixa de espessura t ao longo de a->b, recortada por duas retas (ponto, normal)."""
+    a, b = Vector(a), Vector(b)
     d = (b - a).normalized()
-    n1 = d.cross(Vector((0, 1, 0))).normalized()
-    n2 = d.cross(n1).normalized()
-    return d, n1, n2
-
-
-def bundle(a, b, rmax, count):
-    """Feixe de fibras trançadas ao longo de a->b, abrindo nas pontas."""
-    d, n1, n2 = frame_of(a, b)
-    L = (b - a).length
-    out = []
-    for _ in range(count):
-        phi = rng.uniform(0, 2 * math.pi)
-        rho = rng.uniform(0.35, 1.0)
-        twist = rng.choice((-1, 1)) * rng.uniform(0.5, 1.1)
-        fray = rng.uniform(0.6, 1.6)
-        t0, t1 = -rng.uniform(0.02, 0.14), 1 + rng.uniform(0.02, 0.14)
-        wob_f, wob_a = rng.uniform(2, 5), rng.uniform(0.01, 0.03)
-        pts = []
-        N = 30
-        for k in range(N):
-            t = t0 + (t1 - t0) * k / (N - 1)
-            R = rmax * rho * (0.18 + profile(t)) + fray * max(0.0, -t, t - 1) * 0.45
-            th = phi + twist * 2 * math.pi * t
-            off = n1 * math.cos(th) + n2 * math.sin(th) * 0.8
-            wob = n1 * math.sin(t * wob_f * math.pi + phi) * wob_a
-            pts.append((a + d * (L * t) + off * R + wob, 0.25 + 0.75 * profile(t * 0.9 + 0.05)))
-        out.append(pts)
-    return out
-
-
-def whisker(start, heading, length, curl, rad=0.92):
-    """Fio solto que sai da ponta e se enrola, sem sair da membrana."""
+    n = Vector((-d.y, d.x))
     pts = []
-    pos = Vector(start)
-    ang = math.atan2(heading.z, heading.x)
-    N = 26
-    step = length / N
-    for k in range(N):
-        s = k / (N - 1)
-        pts.append((pos.copy(), 1.0 - 0.85 * s))
-        ang += curl * (0.4 + 1.6 * s) * step * 4
-        pos = pos + Vector((math.cos(ang), 0, math.sin(ang))) * step
-        pos.y = 0.08 * math.sin(s * 6 + start.x * 3)
-        r = math.hypot(pos.x, pos.z)
-        if r > rad:
-            pos.x, pos.z = pos.x * rad / r, pos.z * rad / r
-            ang += curl * 0.6
-    return pts
+    for off in (t / 2, -t / 2):
+        p0 = a + n * off
+        for (cp, cn) in (clip_a, clip_b):
+            cp, cn = Vector(cp), Vector(cn)
+            s = (cp - p0).dot(cn) / d.dot(cn)
+            pts.append(p0 + d * s)
+    # ordem: lado+ (clipA, clipB), lado- (clipB, clipA)
+    return [pts[0], pts[1], pts[3], pts[2]]
 
 
-def arc(a0, a1, r, wav):
-    """Fio que corre por dentro da membrana."""
-    pts = []
-    N = 28
-    for k in range(N):
-        s = k / (N - 1)
-        a = a0 + (a1 - a0) * s
-        rr = r + wav * math.sin(s * math.pi * 3)
-        pts.append((P(rr * math.cos(a), rr * math.sin(a), 0.35 * math.sin(s * math.pi) - 0.1),
-                    0.25 + 0.75 * math.sin(math.pi * s)))
-    return pts
+def k_mesh():
+    H, T, DEPTH = 0.56, 0.21, 0.16
+    bar_l, bar_r = -0.46, -0.46 + T
+    polys = [
+        [(bar_l, -H), (bar_r, -H), (bar_r, H), (bar_l, H)],
+        # braço superior: do meio da haste até o topo direito
+        strip((bar_r, -0.06), (0.40, H), T * 0.95,
+              ((bar_r, 0), (1, 0)), ((0, H), (0, 1))),
+        # perna inferior: do braço até a base direita
+        strip((-0.02, 0.16), (0.44, -H), T * 0.95,
+              ((0, 0.16), (0, 1)), ((0, -H), (0, 1))),
+    ]
+    me = bpy.data.meshes.new("K")
+    bm = bmesh.new()
+    for poly in polys:
+        verts = [bm.verts.new((p[0], 0, p[1])) for p in poly]
+        f = bm.faces.new(verts)
+        f.normal_update()
+        if f.normal.y > 0:
+            f.normal_flip()
+        ext = bmesh.ops.extrude_face_region(bm, geom=[f])
+        nv = [g for g in ext["geom"] if isinstance(g, bmesh.types.BMVert)]
+        bmesh.ops.translate(bm, verts=nv, vec=(0, DEPTH, 0))
+    bmesh.ops.translate(bm, verts=bm.verts, vec=(0, -DEPTH / 2, 0))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me)
+    bm.free()
+    return me
 
 
-fibers, cores = {}, {}
-for name, (a, b, rmax, n) in STROKES.items():
-    fibers[name] = curve_obj(f"K_{name}", bundle(a, b, rmax, n), 0.011, M_FIBER)
-    core_pts = [(a + (b - a) * (k / 19), 0.15 + profile(k / 19)) for k in range(20)]
-    cores[name] = curve_obj(f"Core_{name}", [core_pts], rmax * 0.62, M_CORE)
+shell = add_obj("Shell", uv_sphere("Shell", 1.0), root, mat_shell())
+plasma = add_obj("Plasma", uv_sphere("Plasma", 0.96), root, mat_plasma())
+plasma2 = add_obj("PlasmaInner", uv_sphere("PlasmaInner", 0.78, 64, 32), root, plasma.data.materials[0])
+plasma2.rotation_euler = (0.7, 0.3, 1.1)
+core = add_obj("Core", uv_sphere("Core", 0.9, 32, 16), root, mat_core())
 
-tips = []
-for a, b, _, _ in STROKES.values():
-    d = (b - a).normalized()
-    tips += [(b, d), (a, -d)]
-wh = []
-for pt, d in tips:
-    for _ in range(2):
-        h = Vector((d.x + rng.uniform(-0.6, 0.6), 0, d.z + rng.uniform(-0.6, 0.6))).normalized()
-        wh.append(whisker(pt, h, rng.uniform(0.35, 0.7), rng.choice((-1, 1)) * rng.uniform(0.6, 1.4)))
-whiskers = curve_obj("Fios", wh, 0.012, M_FIBER)
+K = add_obj("K", k_mesh(), None, mat_k())
+bev = K.modifiers.new("Bevel", "BEVEL")
+bev.width = 0.012
+bev.segments = 3
+bev.limit_method = "ANGLE"
 
-arcs_spl = []
-for _ in range(7):
-    a0 = rng.uniform(0, 2 * math.pi)
-    arcs_spl.append(arc(a0, a0 + rng.uniform(0.6, 1.2), rng.uniform(0.62, 0.82), rng.uniform(0.02, 0.06)))
-arcs = curve_obj("Arcos", arcs_spl, 0.009, M_FIBER)
+# luz para dar brilho metálico ao K
+for loc, energy, color in (((-2.5, -3, 2.5), 400, LAVENDER), ((2.5, -2, -1.5), 250, VIOLET_HOT)):
+    ld = bpy.data.lights.new("L", "AREA")
+    ld.energy, ld.size = energy, 2.0
+    ld.color = color[:3]
+    lo = bpy.data.objects.new("Light", ld)
+    lo.location = loc
+    scene.collection.objects.link(lo)
+    tr = lo.constraints.new("TRACK_TO")
+    tr.target = K
 
-# membrana: icosfera deformada por ruído, achatada em profundidade
-bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=5, radius=1.0)
-membrane = bpy.context.active_object
-membrane.name = "Membrana"
-membrane.scale = (1.0, 0.55, 1.0)
-for f in membrane.data.polygons:
-    f.use_smooth = True
-membrane.data.materials.append(M_MEMBRANE)
-tex = bpy.data.textures.new("Wobble", "CLOUDS")
-tex.noise_scale = 0.9
-tex.noise_depth = 1
-wob_ctrl = bpy.data.objects.new("WobbleCtrl", None)
-scene.collection.objects.link(wob_ctrl)
-disp = membrane.modifiers.new("Wobble", "DISPLACE")
-disp.texture = tex
-disp.texture_coords = "OBJECT"
-disp.texture_coords_object = wob_ctrl
-disp.strength = 0.16
-membrane.parent = root
+# ---------------------------------------------------------------- animação
+def ease(id_data, interp="BEZIER", easing="AUTO"):
+    ad = id_data.animation_data
+    if ad and ad.action:
+        for fc in iter_fcurves(ad.action):
+            for kp in fc.keyframe_points:
+                kp.interpolation = interp
+                kp.easing = easing
 
-# ------------------------------------------------------------------ animação
-keys(root, "scale", [(0, (0.001,) * 3), (22, (1.06,) * 3), (34, (0.98,) * 3), (44, (1,) * 3)])
-keys(root, "rotation_euler", [(0, (0, math.radians(-14), 0)), (60, (0, 0, 0)), (END, (0, math.radians(3), 0))])
-keys(wob_ctrl, "location", [(0, (0, 0, 0)), (END, (0.5, 0.3, -0.4))])
-for fc in iter_fcurves(wob_ctrl):
-    for kp in fc.keyframe_points:
-        kp.interpolation = "LINEAR"
 
-keys(M_MEMBRANE.node_tree.nodes["Fade"].inputs[1], "default_value", [(0, 0.0), (18, 1.0)])
+# esfera surge com overshoot
+root.scale = (0.001,) * 3
+root.keyframe_insert("scale", frame=0)
+root.scale = (1.08,) * 3
+root.keyframe_insert("scale", frame=20)
+root.scale = (1,) * 3
+root.keyframe_insert("scale", frame=30)
+# giro contínuo e lento da esfera
+root.rotation_euler = (0, 0, 0)
+root.keyframe_insert("rotation_euler", frame=0)
+root.rotation_euler = (0.25, 0, math.radians(70))
+root.keyframe_insert("rotation_euler", frame=END)
 
-for obj, f0, f1 in ((fibers["Haste"], 14, 52), (fibers["Braco"], 28, 64), (fibers["Perna"], 34, 72),
-                    (whiskers, 50, 96), (arcs, 48, 90)):
-    keys(obj.data, "bevel_factor_end", [(0, 0.0), (f0, 0.0), (f1, 1.0)])
-for name, (f0, f1) in (("Haste", (20, 58)), ("Braco", (34, 70)), ("Perna", (40, 76))):
-    keys(cores[name].data, "bevel_factor_end", [(0, 0.0), (f0, 0.0), (f1, 1.0)])
+# W dos ruídos: filamentos "vivos"
+pm = plasma.data.materials[0].node_tree
+for name, speed in (("NoiseA", 1.6), ("NoiseB", 2.4)):
+    w = pm.nodes[name].inputs["W"]
+    w.default_value = 0.0
+    w.keyframe_insert("default_value", frame=0)
+    w.default_value = speed * END / FPS
+    w.keyframe_insert("default_value", frame=END)
 
-core_nt = M_CORE.node_tree
-keys(core_nt.nodes["CoreStrength"].inputs[1], "default_value", [(0, 0), (60, 0.6), (84, 3.0), (104, 1.4), (END, 1.4)])
-keys(core_nt.nodes["SparkleStrength"].inputs[1], "default_value", [(0, 0), (66, 0), (90, 14), (END, 10)])
-keys(core_nt.nodes["Sparkle"].inputs["W"], "default_value", [(0, 0.0), (END, 1.2)])
-keys(M_FIBER.node_tree.nodes["FiberBsdf"].inputs["Emission Strength"], "default_value",
-     [(0, 0.3), (70, 0.5), (84, 1.3), (104, 0.6), (END, 0.6)])
+ps = pm.nodes["PlasmaStrength"].inputs[1]
+for f, v in ((0, 0), (10, 0), (45, 6), (70, 9), (85, 3.5), (110, 4.5), (130, 3.2), (END, 4)):
+    ps.default_value = v
+    ps.keyframe_insert("default_value", frame=f)
 
-# ------------------------------------------------------------------ saída
-scene.render.image_settings.file_format = "PNG"
-scene.render.image_settings.color_mode = "RGBA"
-os.makedirs(os.path.join(HERE, "renders", "intro"), exist_ok=True)
-scene.render.filepath = os.path.join(HERE, "renders", "intro", "")
-scene.frame_set(END)
+ss = shell.data.materials[0].node_tree.nodes["ShellStrength"].inputs[1]
+for f, v in ((0, 0), (18, 2.5), (32, 1.2), (70, 3), (90, 1.2), (115, 1.6), (135, 1.2), (END, 1.4)):
+    ss.default_value = v
+    ss.keyframe_insert("default_value", frame=f)
+
+cv = core.data.materials[0].node_tree.nodes["CoreVol"].inputs["Emission Strength"]
+for f, v in ((0, 0), (30, 0.1), (70, 0.4), (90, 0.12), (END, 0.15)):
+    cv.default_value = v
+    cv.keyframe_insert("default_value", frame=f)
+
+# K: aparece de trás pra frente com flash
+K.scale = (0.001,) * 3
+K.keyframe_insert("scale", frame=40)
+K.scale = (1.12,) * 3
+K.keyframe_insert("scale", frame=66)
+K.scale = (1,) * 3
+K.keyframe_insert("scale", frame=78)
+K.rotation_euler = (0, 0, math.radians(-90))
+K.keyframe_insert("rotation_euler", frame=40)
+K.rotation_euler = (0, 0, 0)
+K.keyframe_insert("rotation_euler", frame=72)
+K.rotation_euler = (0, 0, math.radians(10))
+K.keyframe_insert("rotation_euler", frame=112)
+K.rotation_euler = (0, 0, math.radians(-6))
+K.keyframe_insert("rotation_euler", frame=END)
+
+ke = K.data.materials[0].node_tree.nodes["KBsdf"].inputs["Emission Strength"]
+for f, v in ((40, 0), (68, 5), (82, 0.45), (115, 0.7), (END, 0.5)):
+    ke.default_value = v
+    ke.keyframe_insert("default_value", frame=f)
+
+# W linear (sem easing)
+for mat in (plasma.data.materials[0],):
+    ad = mat.node_tree.animation_data
+    for fc in iter_fcurves(ad.action):
+        if "NoiseA" in fc.data_path or "NoiseB" in fc.data_path:
+            for kp in fc.keyframe_points:
+                kp.interpolation = "LINEAR"
+for fc in iter_fcurves(root.animation_data.action):
+    if fc.data_path == "rotation_euler":
+        for kp in fc.keyframe_points:
+            kp.interpolation = "LINEAR"
+
+# ---------------------------------------------------------------- compositor: bloom
+scene.render.use_compositing = True
+tree = bpy.data.node_groups.new("KodarisComp", "CompositorNodeTree")
+tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+scene.compositing_node_group = tree
+rl = tree.nodes.new("CompositorNodeRLayers")
+rl.location = (-400, 0)
+glare = tree.nodes.new("CompositorNodeGlare")
+glare.location = (0, 0)
+glare.inputs["Type"].default_value = "Bloom"
+glare.inputs["Quality"].default_value = "High"
+glare.inputs["Threshold"].default_value = 0.9
+glare.inputs["Strength"].default_value = 0.45
+glare.inputs["Size"].default_value = 0.6
+go = tree.nodes.new("NodeGroupOutput")
+go.location = (300, 0)
+tree.links.new(rl.outputs["Image"], glare.inputs["Image"])
+tree.links.new(glare.outputs["Image"], go.inputs[0])
+
+# ---------------------------------------------------------------- saída
+if hasattr(scene.render.image_settings, "media_type"):  # Blender 5.x
+    scene.render.image_settings.media_type = "VIDEO"
+scene.render.image_settings.file_format = "FFMPEG"
+scene.render.ffmpeg.format = "MPEG4"
+scene.render.ffmpeg.codec = "H264"
+scene.render.ffmpeg.constant_rate_factor = "HIGH"
+scene.render.filepath = os.path.join(HERE, "renders", "kodaris_logo_")  # Blender acrescenta 0000-0150.mp4
+
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, "kodaris_logo.blend"))
-print("SAVED")
+print("SAVED", os.path.join(HERE, "kodaris_logo.blend"))
