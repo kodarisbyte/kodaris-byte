@@ -1,0 +1,398 @@
+---
+import '../styles/global.css';
+
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const media = (f: string) => `${base}media/${f}`;
+
+const linkedin = 'https://www.linkedin.com/company/kodarisbyte/';
+
+const servicos = [
+  {
+    nome: 'Apps',
+    texto: 'Aplicativos para celular e web que a sua equipe e os seus clientes usam no dia a dia.',
+    exemplos: ['Agendamento e pedidos', 'Área do cliente', 'Apps internos para equipes de campo'],
+  },
+  {
+    nome: 'Sites',
+    texto: 'Sites rápidos, bonitos e fáceis de atualizar, feitos para trazer contato e venda.',
+    exemplos: ['Sites institucionais', 'Landing pages de campanha', 'Lojas e catálogos'],
+  },
+  {
+    nome: 'Sistemas',
+    texto: 'Sistemas sob medida que tiram o seu negócio das planilhas e juntam tudo num lugar só.',
+    exemplos: ['ERPs e gestão financeira', 'Controle de projetos e prazos', 'Integrações entre ferramentas'],
+  },
+];
+
+// Para adicionar um case, acrescente um objeto aqui.
+const projetos = [
+  {
+    nome: 'ERP UNA',
+    cliente: 'UNA Comunicação',
+    tipo: 'Sistema de gestão',
+    antes: 'A agência controlava JOBs, prazos e financeiro em planilhas separadas. A informação ficava espalhada e era difícil saber o que estava atrasado.',
+    depois: 'Um ERP feito para a rotina da agência: cada JOB com prazos, responsáveis e financeiro no mesmo lugar, e uma visão clara do que precisa de atenção.',
+  },
+];
+
+const etapas = [
+  { titulo: 'Conversa', texto: 'Entendemos o seu negócio, o problema e o que precisa ficar pronto primeiro.' },
+  { titulo: 'Proposta e protótipo', texto: 'Você vê as telas antes do código e aprova escopo, prazo e valor.' },
+  { titulo: 'Desenvolvimento em ciclos', texto: 'Entregas curtas que você testa enquanto o projeto anda.' },
+  { titulo: 'Entrega e suporte', texto: 'Publicamos, treinamos a sua equipe e seguimos por perto depois do lançamento.' },
+];
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kodaris Byte | Apps, sites e sistemas sob medida</title>
+    <meta name="description" content="Transformamos ideias em software. Apps, sites e sistemas sob medida para o seu negócio. Niterói, RJ." />
+    <meta name="theme-color" content="#0b0b14" />
+    <link rel="icon" type="image/png" href={`${base}favicon.png`} />
+    <meta property="og:title" content="Kodaris Byte" />
+    <meta property="og:description" content="Apps, sites e sistemas sob medida para o seu negócio." />
+    <meta property="og:image" content={media('logo-mark.png')} />
+    <!-- Marca que a intro vai rodar antes do primeiro paint (evita flash do conteúdo) -->
+    <script is:inline>
+      (function () {
+        var reduz = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var vista = false;
+        try { vista = sessionStorage.getItem('kb-intro') === '1'; } catch (e) {}
+        if (!reduz && !vista) document.documentElement.classList.add('com-intro');
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div class="intro" aria-hidden="true">
+      <button class="intro-pular" type="button" tabindex="-1">Pular intro</button>
+    </div>
+    <!-- fora da .intro para o mix-blend-mode fundir com o site -->
+    <video class="intro-video" aria-hidden="true" muted playsinline preload="auto" src={media('logo-intro.mp4')}></video>
+
+    <header class="topo">
+      <div class="wrap topo-in">
+        <a class="marca" href="#inicio" aria-label="Kodaris Byte, início">
+          <img class="marca-img" src={media('logo-mark.png')} alt="" width="44" height="44" />
+          <span class="marca-nome">Kodaris Byte</span>
+        </a>
+        <nav class="nav" aria-label="Principal">
+          <a href="#servicos">Serviços</a>
+          <a href="#projetos">Projetos</a>
+          <a href="#processo">Como trabalhamos</a>
+          <a class="btn btn-linha nav-cta" href="#contato">Contato</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="inicio">
+      <section class="hero">
+        <div class="hero-aura" aria-hidden="true"></div>
+        <div class="wrap hero-in">
+          <h1 class="hero-titulo">
+            <span class="linha"><span>Transformamos</span></span>
+            <span class="linha"><span>ideias em</span></span>
+            <span class="linha"><span>software.</span></span>
+          </h1>
+          <div class="hero-pe">
+            <p class="hero-sub">
+              Apps, sites e sistemas sob medida para o seu negócio. Somos uma equipe de
+              desenvolvimento de Niterói, RJ, do primeiro rascunho ao sistema rodando.
+            </p>
+            <div class="hero-acoes">
+              <a class="btn btn-primario" href="#contato">Conversar sobre um projeto</a>
+              <a class="btn btn-linha" href="#projetos">Ver projetos</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="servicos" class="secao">
+        <div class="wrap">
+          <h2 class="secao-titulo">O que fazemos</h2>
+          <ul class="servicos">
+            {servicos.map((s) => (
+              <li class="servico">
+                <h3 class="servico-nome">{s.nome}</h3>
+                <div class="servico-corpo">
+                  <p>{s.texto}</p>
+                  <ul class="servico-exemplos">
+                    {s.exemplos.map((e) => <li>{e}</li>)}
+                  </ul>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section id="projetos" class="secao">
+        <div class="wrap">
+          <h2 class="secao-titulo">Projetos</h2>
+          {projetos.map((p) => (
+            <article class="case">
+              <header class="case-topo">
+                <h3 class="case-nome">{p.nome}</h3>
+                <p class="case-meta">{p.tipo} para {p.cliente}</p>
+              </header>
+              <div class="case-corpo">
+                <div>
+                  <h4>Antes</h4>
+                  <p>{p.antes}</p>
+                </div>
+                <div>
+                  <h4>Depois</h4>
+                  <p>{p.depois}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+          <p class="mais-cases">Novos cases chegando. Quer ver o seu aqui?
+            <a href="#contato">Fale com a gente.</a></p>
+        </div>
+      </section>
+
+      <section id="processo" class="secao">
+        <div class="wrap">
+          <h2 class="secao-titulo">Como trabalhamos</h2>
+          <ol class="etapas">
+            {etapas.map((e, i) => (
+              <li class="etapa">
+                <span class="etapa-n" aria-hidden="true">{i + 1}</span>
+                <h3>{e.titulo}</h3>
+                <p>{e.texto}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section id="contato" class="contato">
+        <div class="wrap">
+          <h2 class="contato-titulo">Tem uma ideia? A gente transforma em software.</h2>
+          <p class="contato-sub">Conte o que você precisa. Respondemos com os próximos passos e uma estimativa.</p>
+          <div class="hero-acoes">
+            <a class="btn btn-primario" href={linkedin} target="_blank" rel="noopener">Falar no LinkedIn</a>
+            <!-- TODO: e-mail e WhatsApp da empresa -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="rodape">
+      <div class="wrap rodape-in">
+        <span>© {new Date().getFullYear()} Kodaris Byte</span>
+        <span>Niterói, RJ</span>
+      </div>
+    </footer>
+
+    <script>
+      import { iniciarIntro } from '../scripts/intro';
+      iniciarIntro();
+    </script>
+  </body>
+</html>
+
+<style>
+  /* ---------- topo ---------- */
+  .topo {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 20;
+    height: var(--header-h);
+    background: color-mix(in srgb, var(--noite) 82%, transparent);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid color-mix(in srgb, var(--linha) 60%, transparent);
+  }
+  .topo-in { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .marca { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+  .marca-img { width: 44px; height: 44px; }
+  .marca-nome {
+    font-family: var(--f-display);
+    font-weight: 400;
+    font-size: .95rem;
+    letter-spacing: .14em;
+    color: var(--lavanda-clara);
+  }
+  .nav { display: flex; align-items: center; gap: clamp(16px, 2.5vw, 32px); font-size: .95rem; }
+  .nav a:not(.btn) { text-decoration: none; color: var(--texto-suave); transition: color .2s; }
+  .nav a:not(.btn):hover { color: var(--texto); }
+  .nav-cta { padding: .6em 1.1em; }
+  @media (max-width: 760px) {
+    .nav a:not(.btn) { display: none; }
+    .marca-nome { font-size: .8rem; }
+  }
+
+  /* ---------- hero ---------- */
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    align-items: flex-end;
+    padding: calc(var(--header-h) + 48px) 0 clamp(48px, 9vh, 96px);
+    overflow: hidden;
+  }
+  .hero-aura {
+    position: absolute;
+    width: min(90vmin, 900px);
+    aspect-ratio: 1;
+    right: -18vmin;
+    top: 8vh;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(122 95 176 / .38), rgb(72 56 104 / .16) 45%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-in { position: relative; }
+  .hero-titulo {
+    font-weight: 300;
+    font-size: clamp(2.2rem, 7.4vw, 7rem);
+    line-height: .98;
+    letter-spacing: -.035em;
+    color: var(--texto);
+  }
+  .linha { display: block; overflow: hidden; padding-bottom: .06em; }
+  .linha > span { display: inline-block; }
+  .hero-titulo .linha:last-child { color: var(--lavanda-clara); }
+  .hero-pe {
+    margin-top: clamp(28px, 5vh, 56px);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 28px;
+  }
+  .hero-sub { max-width: 46ch; color: var(--texto-suave); font-size: 1.125rem; }
+  .hero-acoes { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* ---------- seções ---------- */
+  .secao { padding: clamp(72px, 12vh, 140px) 0; border-top: 1px solid var(--linha); }
+  .secao-titulo {
+    font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+    font-weight: 400;
+    letter-spacing: -.01em;
+    margin-bottom: clamp(32px, 6vh, 64px);
+    color: var(--lavanda-clara);
+  }
+
+  .servicos { list-style: none; margin: 0; padding: 0; }
+  .servico {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 24px 48px;
+    padding: clamp(28px, 4vh, 44px) 0;
+    border-top: 1px solid var(--linha);
+  }
+  .servico:last-child { border-bottom: 1px solid var(--linha); }
+  .servico-nome {
+    font-size: clamp(2.4rem, 7vw, 5.6rem);
+    font-weight: 200;
+    line-height: 1;
+    letter-spacing: -.03em;
+    transition: color .3s, font-weight .3s;
+  }
+  .servico:hover .servico-nome { color: var(--lavanda-clara); font-weight: 400; }
+  .servico-corpo { max-width: 52ch; align-self: center; }
+  .servico-corpo > p { font-size: 1.125rem; }
+  .servico-exemplos { margin: 14px 0 0; padding: 0; list-style: none; color: var(--texto-suave); display: flex; flex-wrap: wrap; gap: 6px 20px; }
+  .servico-exemplos li::before { content: '+ '; color: var(--violeta); }
+  @media (max-width: 760px) { .servico { grid-template-columns: 1fr; } }
+
+  .case {
+    background: var(--superficie);
+    border-radius: 28px;
+    padding: clamp(24px, 4vw, 56px);
+    position: relative;
+    overflow: hidden;
+  }
+  .case::after {
+    content: '';
+    position: absolute;
+    width: 420px;
+    aspect-ratio: 1;
+    right: -140px;
+    top: -160px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgb(122 95 176 / .35), transparent 65%);
+    pointer-events: none;
+  }
+  .case-topo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; margin-bottom: clamp(28px, 5vh, 48px); }
+  .case-nome { font-size: clamp(2rem, 5vw, 3.6rem); font-weight: 300; letter-spacing: -.02em; }
+  .case-meta { color: var(--texto-suave); }
+  .case-corpo { display: grid; grid-template-columns: 1fr 1fr; gap: 32px clamp(32px, 5vw, 72px); position: relative; z-index: 1; }
+  .case-corpo h4 { margin: 0 0 8px; font: 500 1rem var(--f-texto); color: var(--lavanda); }
+  .case-corpo p { max-width: 48ch; }
+  @media (max-width: 760px) { .case-corpo { grid-template-columns: 1fr; } }
+  .mais-cases { margin-top: 28px; color: var(--texto-suave); }
+  .mais-cases a { color: var(--lavanda-clara); }
+
+  .etapas {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 32px;
+  }
+  .etapa { border-top: 1px solid var(--lavanda); padding-top: 20px; }
+  .etapa-n { font: 300 2.4rem/1 var(--f-display); color: var(--violeta); display: block; margin-bottom: 20px; }
+  .etapa h3 { font-size: 1.1rem; font-weight: 400; margin-bottom: 10px; }
+  .etapa p { color: var(--texto-suave); font-size: 1rem; }
+  @media (max-width: 960px) { .etapas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .etapas { grid-template-columns: 1fr; } }
+
+  .contato { padding: clamp(96px, 16vh, 180px) 0; border-top: 1px solid var(--linha); text-align: left; }
+  .contato-titulo {
+    font-size: clamp(2rem, 6vw, 4.8rem);
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    max-width: 16ch;
+  }
+  .contato-sub { margin: 24px 0 36px; color: var(--texto-suave); max-width: 50ch; font-size: 1.125rem; }
+
+  .rodape { border-top: 1px solid var(--linha); padding: 28px 0; color: var(--texto-suave); font-size: .9rem; }
+  .rodape-in { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- intro ---------- */
+  .intro { display: none; }
+  :global(html.com-intro) .intro {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--noite);
+  }
+  .intro-video { display: none; }
+  :global(html.com-intro) .intro-video {
+    display: block;
+    z-index: 51;
+    position: fixed;
+    width: min(78vmin, 640px);
+    height: auto;
+    aspect-ratio: 1;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+  .intro-pular {
+    position: fixed;
+    right: var(--gutter);
+    bottom: 24px;
+    background: none;
+    border: 1px solid var(--linha);
+    color: var(--texto-suave);
+    border-radius: 999px;
+    padding: .55em 1.1em;
+    font: 500 .9rem var(--f-texto);
+    cursor: pointer;
+  }
+  .intro-pular:hover { color: var(--texto); border-color: var(--lavanda); }
+  /* conteúdo começa escondido enquanto a intro roda */
+  :global(html.com-intro) .topo > .wrap > *,
+  :global(html.com-intro) .hero-pe,
+  :global(html.com-intro) .hero-aura { opacity: 0; }
+  :global(html.com-intro) .linha > span { transform: translateY(105%); }
+</style>

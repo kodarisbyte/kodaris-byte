@@ -17,3 +17,20 @@ Site institucional e portfólio da **Kodaris Byte** (Niterói, RJ).
 ## Identidade visual
 
 Veja [`docs/brand.md`](docs/brand.md).
+
+## Site (Astro + GSAP)
+
+```bash
+cd site
+npm install
+npm run dev      # http://localhost:4321/kodaris-byte/
+npm run build    # gera site/dist
+```
+
+- Página: `site/src/pages/index.astro` (serviços, projetos e etapas ficam em listas no topo do arquivo — para adicionar um case, acrescente um item em `projetos`).
+- Intro animada: `site/src/scripts/intro.ts`. A logo toca grande no centro, encolhe enquanto o site aparece e vai para o canto superior esquerdo. Roda uma vez por sessão e é pulada com "reduzir movimento" ativado no sistema.
+- Mídia: `site/public/media/` (gerada a partir de `blender/renders/`).
+
+### Pendências de conteúdo
+- E-mail e WhatsApp da empresa na seção Contato (hoje só LinkedIn).
+- Mais cases além do ERP UNA.
