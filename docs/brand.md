@@ -15,21 +15,21 @@ Paleta extraída da logo e da capa da página no LinkedIn (valores aproximados, 
 
 ## Logo
 
-- Símbolo: membrana gelatinosa lavanda com um **K** formado por feixes de fibras trançadas, fios soltos enrolando por dentro (original: `assets/brand/logo-original-linkedin.png`).
+- Original de referência: `assets/brand/logo-original-linkedin.png` (membrana com K de fibras).
+- Versão animada escolhida pela equipe: **K lavanda dentro de uma esfera de plasma roxa**.
 - Versão na capa: "K" geométrico lavanda entre parênteses — `( K )`.
 - Tipografia do letreiro: sans-serif geométrica, caixa alta, espaçamento largo.
 
 ## Animação (Blender)
 
-Objetivo: versão animada da logo (esfera de plasma pulsando com o K surgindo), renderizada com fundo transparente para uso no hero do site.
+`blender/build_logo.py` monta a cena: esfera de plasma surge, filamentos acendem, K aparece com flash e fica pulsando.
 
 ### Arquivos gerados (`blender/renders/`)
 
 | Arquivo | Uso |
 |---|---|
-| `logo-intro.webm` | Intro animada 4 s, VP9 **com transparência** (Chrome, Edge, Firefox) |
-| `logo-intro.mp4` | Mesma intro sobre `#0B0B14` (fallback para Safari) |
-| `logo.png` / `logo-512.png` | Logo estática transparente (header, redes) |
+| `kodaris_logo.mp4` | Intro animada 5 s, 1080×1080, fundo preto — no site usar `mix-blend-mode: screen` |
+| `logo.png` / `logo-512.png` | Último frame (logo estática, fundo preto → também com `screen`) |
 | `favicon-64.png` | Favicon |
 
 Regerar: `blender -b --factory-startup --python blender/build_logo.py` e depois `blender -b blender/kodaris_logo.blend -a`.
