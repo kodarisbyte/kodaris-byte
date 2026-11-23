@@ -18,6 +18,10 @@ Site institucional e portfólio da **Kodaris Byte** (Niterói, RJ).
 
 Veja [`docs/brand.md`](docs/brand.md).
 
+## Como contribuir
+
+Nunca usou Git? Comece pelo [guia de workflow](CONTRIBUTING.md): instalação, dia a dia com branches e Pull Requests, e o que fazer quando algo dá errado.
+
 ## Site (Astro + GSAP)
 
 ```bash
